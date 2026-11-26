@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laguna Flight — mail runs over the Merpati archipelago</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1c2c; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #eef4f8; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  .hidden { display: none !important; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: absolute; inset: 0; font-variant-numeric: tabular-nums; }
+  .hud-left { position: absolute; top: 14px; left: 14px; display: flex; gap: 10px; align-items: flex-start; }
+  #attitude { background: rgba(2,10,18,0.55); border-radius: 50%; border: 2px solid rgba(180,220,255,0.5); box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 2px 10px rgba(0,0,0,0.35); }
+  .readouts { display: flex; flex-direction: column; gap: 4px; }
+  .ro { background: rgba(4,12,20,0.62); border: 1px solid rgba(160,210,255,0.28); border-radius: 8px; padding: 4px 9px; font-size: 13px; min-width: 112px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .ro label { color: #8fd0ff; font-size: 10px; letter-spacing: 2px; font-weight: 700; margin-right: 6px; }
+  .ro b { font-size: 18px; font-weight: 700; }
+  .ro span { color: #8fd0ff; font-size: 11px; margin-left: 3px; }
+  .hud-right { position: absolute; top: 14px; right: 14px; text-align: right; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .craft-badge { background: #ffb62e; color: #1a1a1a; font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 13px; letter-spacing: 1px; box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+  .time-badge { background: rgba(4,12,20,0.62); color: #9fc4e0; font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 12px; letter-spacing: 3px; border: 1px solid rgba(255,255,255,0.25); }
+  /* At night the instruments glow so they stay readable in the dark. */
+  #hud.night .ro { background: rgba(0,10,30,0.72); border: 1px solid rgba(120,200,255,0.35); }
+  #hud.night .ro b { color: #bfe9ff; text-shadow: 0 0 8px rgba(90,180,255,0.8); }
+  #hud.night .ro label, #hud.night .ro span { color: #7fd0ff; }
+  #hud.night #attitude { border-color: rgba(120,200,255,0.6); box-shadow: 0 0 14px rgba(60,140,255,0.35); }
+  #hud.night .time-badge { background: #0a1a3a; color: #bfe9ff; border-color: rgba(120,200,255,0.6); text-shadow: 0 0 8px rgba(90,180,255,0.8); }
+  #hud.night .score b, #hud.night #dir-arrow { text-shadow: 0 0 8px rgba(255,182,46,0.8); }
+  .objective { background: rgba(4,12,20,0.62); border: 1px solid rgba(160,210,255,0.22); padding: 6px 11px; border-radius: 8px; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .director { background: rgba(4,12,20,0.62); border: 1px solid rgba(160,210,255,0.22); padding: 6px 11px; border-radius: 8px; font-size: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  #dir-arrow { display: inline-block; color: #ffb62e; font-size: 17px; margin-right: 6px; }
+  .score { background: rgba(4,12,20,0.62); border: 1px solid rgba(160,210,255,0.22); padding: 6px 11px; border-radius: 8px; font-size: 13px; letter-spacing: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .score b { font-size: 20px; color: #ffb62e; }
+  .rings { font-size: 18px; letter-spacing: 4px; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+  .rings .done { color: #2ecc40; }
+  .rings .next { color: #ffb62e; }
+  .hud-bottom { position: absolute; left: 14px; bottom: 14px; display: flex; gap: 16px; align-items: center; background: rgba(4,12,20,0.62); border: 1px solid rgba(160,210,255,0.22); padding: 9px 13px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.35); }
+  .throttle, .fuel { display: flex; gap: 8px; align-items: center; font-size: 12px; }
+  .throttle label, .fuel label { color: #8fd0ff; font-size: 10px; letter-spacing: 2px; font-weight: 700; }
+  .tbar { width: 110px; height: 10px; background: rgba(255,255,255,0.2); border-radius: 5px; overflow: hidden; }
+  .tbar div { height: 100%; background: #ffb62e; width: 0%; }
+  #fuel-fill { background: #2ecc40; }
+  .flags { display: flex; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+  .flags span { padding: 3px 7px; border-radius: 4px; background: rgba(255,255,255,0.15); color: #ccc; }
+  .flags .on { background: #2ecc40; color: #06210a; }
+  .flags .off { background: #c22e2e; color: #fff; }
+  .hud-buttons { position: absolute; right: 14px; bottom: 14px; display: flex; gap: 8px; pointer-events: auto; }
+  .hud-buttons button { background: rgba(4,12,20,0.62); color: #fff; border: 1px solid rgba(160,210,255,0.35); border-radius: 8px; padding: 8px 11px; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .hud-buttons button:hover { background: rgba(255,182,46,0.8); color: #1a1a1a; }
+  .hud-buttons .key { color: #ffb62e; font-weight: 400; margin-left: 2px; }
+  .warn { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); background: #c22e2e; color: #fff; font-size: 26px; font-weight: 900; letter-spacing: 3px; padding: 8px 22px; border-radius: 8px; animation: blink 0.5s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0.35; } }
+  .toast { position: absolute; bottom: 84px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.65); padding: 8px 16px; border-radius: 20px; font-size: 15px; }
+
+  /* ---------- Touch controls (phones/tablets only) ---------- */
+  #touch-controls { display: none; position: absolute; inset: 0; pointer-events: none; }
+  #ui.touch #touch-controls { display: block; }
+  #ui.touch .hud-buttons { display: none; }
+  #ui.touch .keys.kbd { display: none; }
+  .touch-only { display: none; }
+  #ui.touch .touch-only { display: block; }
+  #touch-controls > * { pointer-events: auto; }
+  #stick { position: absolute; left: 16px; bottom: 64px; width: 128px; height: 128px; border-radius: 50%; background: rgba(4,12,20,0.45); border: 2px solid rgba(160,210,255,0.35); touch-action: none; }
+  #stick-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; border-radius: 50%; background: rgba(255,182,46,0.85); border: 2px solid rgba(255,255,255,0.5); transform: translate(-50%, -50%); box-shadow: 0 2px 10px rgba(0,0,0,0.4); }
+  #thr-slider { position: absolute; right: 16px; bottom: 64px; width: 56px; height: 180px; border-radius: 28px; background: rgba(4,12,20,0.45); border: 2px solid rgba(160,210,255,0.35); touch-action: none; }
+  #thr-track { position: absolute; left: 50%; top: 12px; bottom: 12px; width: 6px; transform: translateX(-50%); background: rgba(255,255,255,0.2); border-radius: 3px; }
+  #thr-handle { position: absolute; left: 50%; bottom: 0%; width: 44px; height: 22px; transform: translate(-50%, 50%); background: #ffb62e; border-radius: 11px; border: 2px solid rgba(255,255,255,0.6); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+  #touch-actions { position: absolute; right: 16px; bottom: 260px; display: flex; flex-direction: column; gap: 8px; }
+  #touch-actions button { width: 56px; height: 48px; border-radius: 12px; background: rgba(4,12,20,0.62); color: #fff; border: 1px solid rgba(160,210,255,0.4); font-size: 11px; font-weight: 800; letter-spacing: 1px; cursor: pointer; }
+  #touch-actions button:active { background: #ffb62e; color: #1a1a1a; }
+  #touch-actions #btn-brake { background: rgba(194,46,46,0.75); }
+  #touch-actions #btn-brake.held { background: #ff5a5a; color: #fff; }
+
+  /* ---------- Overlays ---------- */
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgba(6,24,42,0.82), rgba(10,40,66,0.72)); pointer-events: auto; overflow-y: auto; padding: 20px; }
+  .panel { width: min(880px, 96vw); background: rgba(8, 28, 46, 0.92); border: 1px solid rgba(255,255,255,0.18); border-radius: 16px; padding: 26px 30px; }
+  .panel.narrow { width: min(480px, 94vw); text-align: center; }
+  .panel h1 { font-size: 44px; letter-spacing: 4px; color: #ffb62e; text-align: center; text-shadow: 0 0 24px rgba(255,182,46,0.35); }  .panel h2 { font-size: 19px; margin: 18px 0 10px; color: #9fc4e0; letter-spacing: 2px; }
+  .tag { text-align: center; color: #cfe2ef; margin-top: 6px; font-size: 15px; }
+  .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .cards.sorties { grid-template-columns: repeat(4, 1fr); }
+  .card { background: rgba(255,255,255,0.06); border: 2px solid transparent; border-radius: 10px; padding: 10px; cursor: pointer; }
+  .card:hover { border-color: rgba(255,182,46,0.6); }
+  .card.sel { border-color: #ffb62e; background: rgba(255,182,46,0.14); }
+  .card b { display: block; font-size: 14px; }
+  .card i { display: block; font-style: normal; font-size: 11px; color: #9fc4e0; margin: 2px 0 6px; }
+  .card span { font-size: 11px; color: #cfe2ef; }
+  .swatch { height: 8px; border-radius: 4px; margin-bottom: 8px; }
+  .stats { font-size: 10px; color: #9fc4e0; display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+  .bar { display: inline-block; width: 58px; height: 6px; background: rgba(255,255,255,0.18); border-radius: 3px; overflow: hidden; vertical-align: middle; }
+  .bar span { display: block; height: 100%; background: #ffb62e; }
+  .preview { display: flex; gap: 16px; align-items: center; margin-top: 12px; }
+  .preview canvas { background: radial-gradient(circle at 50% 40%, rgba(70,130,180,0.5), rgba(8,28,46,0.9)); border-radius: 10px; }
+  .preview p { font-size: 13px; color: #cfe2ef; line-height: 1.5; }
+  button.big { display: block; width: 100%; margin-top: 22px; padding: 14px; font-size: 18px; font-weight: 900; letter-spacing: 2px; color: #1a1a1a; background: #ffb62e; border: none; border-radius: 10px; cursor: pointer; }
+  button.big:hover { background: #ffc95e; }
+  button.ghost { display: block; width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; font-weight: 700; color: #eef4f8; background: transparent; border: 1px solid rgba(255,255,255,0.4); border-radius: 10px; cursor: pointer; }
+  button.ghost:hover { border-color: #ffb62e; color: #ffb62e; }
+  .keys { text-align: center; font-size: 12px; color: #9fc4e0; margin-top: 14px; }
+  .scoreboard div { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.12); font-size: 15px; }
+  .scoreboard div:last-child b { color: #ffb62e; font-size: 20px; }
+  #brief-text, #crash-text { color: #cfe2ef; line-height: 1.6; margin-top: 10px; font-size: 15px; }
+  @media (max-width: 760px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .cards.sorties { grid-template-columns: 1fr; }
+    .panel h1 { font-size: 32px; }
+    .preview { flex-direction: column; }
+    .preview canvas { max-width: 100%; height: auto; }
+    /* Menu fix: the panel is taller than a phone screen and used to be
+       flex-centred, so its top (title) sat above the viewport and START
+       ENGINE sat below the fold. Top-align, and pin the primary button
+       to the bottom of the screen while scrolling. */
+    .overlay { align-items: flex-start; }
+    .panel { padding: 18px 16px; }
+    #menu button.big { position: sticky; bottom: 10px; z-index: 5; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+    /* Flight HUD fix: the top clusters overlapped and the bottom bar
+       (578px wide) ran off-screen under the action buttons. Shrink the
+       top, make the bottom a slim full-width strip. */
+    #attitude { width: 104px; height: 104px; }
+    .ro { min-width: 0; font-size: 11px; padding: 3px 7px; }
+    .ro b { font-size: 15px; }
+    .hud-right { max-width: 46vw; }
+    .objective, .director, .score { font-size: 12px; padding: 4px 8px; }
+    .rings { font-size: 15px; letter-spacing: 2px; }
+    .craft-badge, .time-badge { font-size: 11px; padding: 4px 9px; }
+    .hud-bottom { left: 0; right: 0; bottom: 0; border-radius: 0; justify-content: center; padding: 7px 6px; gap: 8px; overflow: hidden; }
+    .hud-bottom .tbar { width: 44px; }
+    .hud-bottom .throttle, .hud-bottom .fuel { gap: 5px; }
+    .hud-bottom .throttle label, .hud-bottom .fuel label { font-size: 9px; }
+    .hud-bottom .flags { gap: 5px; }
+    .hud-bottom .flags span { padding: 3px 5px; font-size: 10px; }
+    .hud-buttons { flex-wrap: wrap; justify-content: flex-end; max-width: 62vw; }
+    .hud-buttons button { padding: 10px 12px; min-height: 44px; }
+    .toast { bottom: 210px; }
+    .warn { font-size: 20px; top: 30%; }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui"></div>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
