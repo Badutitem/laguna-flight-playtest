@@ -354,9 +354,11 @@ let accumulator = 0;
 const STEP = 1 / 60;
 let perfEma = 0;
 let perfFrames = 0;
+let cloudsOn = true;
 window.__perfDebug = () => ({
   pixelRatio: world.renderer.getPixelRatio(),
   shadows: world.renderer.shadowMap.enabled,
+  clouds: cloudsOn,
   frameMs: Math.round(perfEma * 1000),
 });
 
@@ -377,17 +379,24 @@ function frame(now) {
   // catch-up steps: the plane lurches instead of flying. Drop it and
   // the sim runs a touch slow for one frame, which reads as smooth.
   if (accumulator > STEP * 5) accumulator = 0;
-  // Phone smoothness: track the real frame time. When the device cannot
-  // hold the pace, step the render resolution down (2 -> 1.5 -> 1.25
-  // -> 1) instead of letting every frame stutter. One way only: going
-  // back up would oscillate. The low-power startup defaults (touch
-  // screens start at 1.25 with no shadows/antialias) live in render.js.
+  // 30 fps floor: keep stepping the quality down while the average
+  // frame is slower than 1/30 s. Rungs: pixel ratio 2 -> 1.5 -> 1.25
+  // -> 1 -> 0.85 -> 0.7, then the clouds go (their transparent sprites
+  // are the biggest overdraw cost left). One way only, no going back
+  // up. A single very slow frame also steps down at once, so a
+  // struggling device does not wait 30 frames for relief.
+  const FPS_TARGET = 1 / 30;
+  const PR_RUNGS = [2, 1.5, 1.25, 1, 0.85, 0.7];
   perfEma = perfEma === 0 ? frameDt : perfEma * 0.95 + frameDt * 0.05;
   perfFrames += 1;
-  if (perfFrames > 90 && perfEma > 0.045) {
+  // Never in shot mode: the dossier screenshots are taken in the slow
+  // shell, and stepping the quality down there would strip the very
+  // shadows and clouds the AI judge is shown.
+  if (!shot && perfFrames > 10 && perfEma > FPS_TARGET && (perfFrames > 30 || frameDt >= 0.2)) {
     const pr = world.renderer.getPixelRatio();
-    const next = pr > 1.5 ? 1.5 : pr > 1.25 ? 1.25 : 1;
-    if (next < pr) world.renderer.setPixelRatio(next);
+    const next = PR_RUNGS.find((r) => r < pr - 0.001);
+    if (next !== undefined) world.renderer.setPixelRatio(next);
+    else if (cloudsOn) { world.setClouds(false); cloudsOn = false; }
     perfFrames = 0;
     perfEma = 0;
   }

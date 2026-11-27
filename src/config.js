@@ -103,8 +103,8 @@ export const SORTIES = [
     from: 'merpati', to: 'kenari', timeOfDay: 'day', wind: { gust: 0 },
     fuel: 1.0, brief: 'Take off, thread five sky rings over the lagoon, land at Kenari. 5 enemy jets patrol the route — gun them down for bonus points.',
     rings: [
-      [900, 170, 300], [1900, 220, -500], [2900, 260, -1400],
-      [3800, 220, -2100], [4300, 160, -2500],
+      [900, 320, 300], [1900, 370, -500], [2900, 410, -1400],
+      [3800, 370, -2100], [4300, 310, -2500],
     ],
   },
   {
@@ -112,8 +112,8 @@ export const SORTIES = [
     from: 'kenari', to: 'merpati', timeOfDay: 'day', wind: { gust: 1 },
     fuel: 0.9, brief: 'Six rings in a stiff crosswind. 6 enemy jets on the route. Hold your line, watch the gusts.',
     rings: [
-      [3600, 200, -2100], [2600, 260, -1400], [1600, 300, -600],
-      [700, 240, 100], [-200, 190, 600], [100, 150, 850],
+      [3600, 350, -2100], [2600, 410, -1400], [1600, 450, -600],
+      [700, 390, 100], [-200, 340, 600], [100, 300, 850],
     ],
   },
   {
@@ -121,8 +121,8 @@ export const SORTIES = [
     from: 'merpati', to: 'kenari', timeOfDay: 'dusk', wind: { gust: 0.4 },
     fuel: 0.85, brief: 'Seven rings as the sun goes down. 7 enemy jets, some carry missiles. Land by runway lights.',
     rings: [
-      [1000, 200, 200], [1800, 280, -700], [900, 320, -1600],
-      [-800, 300, -1400], [-1800, 240, -200], [-1200, 200, 700], [200, 150, 850],
+      [1000, 350, 200], [1800, 430, -700], [900, 470, -1600],
+      [-800, 450, -1400], [-1800, 390, -200], [-1200, 350, 700], [200, 300, 850],
     ],
   },
   {
@@ -130,8 +130,8 @@ export const SORTIES = [
     from: 'merpati', to: 'kenari', timeOfDay: 'night', wind: { gust: 0.2 },
     fuel: 0.9, brief: 'Six rings under the moon. 8 enemy jets in the dark. Trust your instruments and the runway lights.',
     rings: [
-      [1000, 210, 250], [2000, 270, -600], [3000, 250, -1500],
-      [3900, 230, -2100], [4300, 180, -2500], [4100, 150, -2700],
+      [1000, 360, 250], [2000, 420, -600], [3000, 400, -1500],
+      [3900, 380, -2100], [4300, 330, -2500], [4100, 300, -2700],
     ],
   },
   {
@@ -139,8 +139,8 @@ export const SORTIES = [
     from: 'merpati', to: 'kenari', timeOfDay: 'day', wind: { gust: 0.3 },
     fuel: 0.9, brief: 'Six rings at first light. 9 enemy jets sweep the lagoon. Clear the sky, then land the mail.',
     rings: [
-      [1000, 200, 100], [2000, 260, -700], [3000, 280, -1500],
-      [3800, 240, -2100], [4200, 180, -2500], [4100, 150, -2700],
+      [1000, 350, 100], [2000, 410, -700], [3000, 430, -1500],
+      [3800, 390, -2100], [4200, 330, -2500], [4100, 300, -2700],
     ],
   },
   {
@@ -148,8 +148,8 @@ export const SORTIES = [
     from: 'kenari', to: 'merpati', timeOfDay: 'day', wind: { gust: 0.6 },
     fuel: 0.9, brief: 'Six rings back across the lagoon. 10 enemy jets, missile carriers among them. Hunt them between the rings.',
     rings: [
-      [3400, 210, -2000], [2400, 270, -1300], [1400, 300, -500],
-      [600, 240, 100], [-300, 190, 600], [100, 150, 850],
+      [3400, 360, -2000], [2400, 420, -1300], [1400, 450, -500],
+      [600, 390, 100], [-300, 340, 600], [100, 300, 850],
     ],
   },
   {
@@ -157,8 +157,8 @@ export const SORTIES = [
     from: 'merpati', to: 'kenari', timeOfDay: 'dusk', wind: { gust: 0.5 },
     fuel: 0.85, brief: 'Seven rings into the sunset. 11 enemy jets intercept the mail run. Land by runway lights.',
     rings: [
-      [1100, 210, 300], [1900, 290, -600], [1000, 330, -1500],
-      [-700, 310, -1300], [-1700, 250, -100], [-1100, 210, 800], [200, 160, 850],
+      [1100, 360, 300], [1900, 440, -600], [1000, 480, -1500],
+      [-700, 460, -1300], [-1700, 400, -100], [-1100, 360, 800], [200, 310, 850],
     ],
   },
   {
@@ -166,8 +166,8 @@ export const SORTIES = [
     from: 'kenari', to: 'merpati', timeOfDay: 'night', wind: { gust: 0.3 },
     fuel: 0.9, brief: 'Six rings under the moon. 12 enemy jets on patrol. Your gun charges the missile — spend it wisely.',
     rings: [
-      [3500, 220, -2200], [2500, 280, -1400], [1500, 310, -600],
-      [600, 250, 200], [-100, 200, 700], [0, 160, 900],
+      [3500, 370, -2200], [2500, 430, -1400], [1500, 460, -600],
+      [600, 400, 200], [-100, 350, 700], [0, 310, 900],
     ],
   },
   {
@@ -175,8 +175,8 @@ export const SORTIES = [
     from: 'merpati', to: 'kenari', timeOfDay: 'day', wind: { gust: 1 },
     fuel: 0.85, brief: 'Seven rings in a storm crosswind. 13 enemy jets in the murk. Hold your line and fight through.',
     rings: [
-      [900, 180, 400], [1800, 240, -400], [2800, 300, -1200],
-      [3600, 260, -1900], [4200, 200, -2400], [4300, 170, -2600], [4100, 150, -2750],
+      [900, 330, 400], [1800, 390, -400], [2800, 450, -1200],
+      [3600, 410, -1900], [4200, 350, -2400], [4300, 320, -2600], [4100, 300, -2750],
     ],
   },
   {
@@ -184,8 +184,8 @@ export const SORTIES = [
     from: 'kenari', to: 'merpati', timeOfDay: 'dusk', wind: { gust: 0.8 },
     fuel: 0.85, brief: 'Seven rings home at dusk. 14 enemy jets — the full squadron. Survive the gauntlet and bring the mail home.',
     rings: [
-      [3800, 220, -2300], [2900, 280, -1600], [1900, 320, -800],
-      [900, 280, 0], [0, 220, 500], [-200, 180, 800], [0, 150, 900],
+      [3800, 370, -2300], [2900, 430, -1600], [1900, 470, -800],
+      [900, 430, 0], [0, 370, 500], [-200, 330, 800], [0, 300, 900],
     ],
   },
 ];
