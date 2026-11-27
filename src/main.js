@@ -4,10 +4,11 @@
 import { AIRCRAFT, AIRFIELDS, SORTIES, CHARGER_PER_RING } from './config.js';
 import { createWorld } from './render.js';
 import { createHud } from './hud.js';
-import { createInput, ACTION_CONFIRM, ACTION_PAUSE, ACTION_RESTART, ACTION_GEAR, ACTION_FLAPS, ACTION_CAMERA, ACTION_MUTE, ACTION_BACK, ACTION_MISSILE } from './input.js';
+import { createInput, ACTION_CONFIRM, ACTION_PAUSE, ACTION_RESTART, ACTION_GEAR, ACTION_FLAPS, ACTION_CAMERA, ACTION_MUTE, ACTION_BACK, ACTION_MISSILE, ACTION_LOOP, ACTION_ROLL } from './input.js';
 import { createAudio } from './audio.js';
-import { createFlightState, stepFlight, EVENT_CRASH, EVENT_LANDED, EVENT_FUEL_EMPTY, EVENT_STALL } from './flightModel.js';
+import { createFlightState, stepFlight, startStunt, EVENT_CRASH, EVENT_LANDED, EVENT_FUEL_EMPTY, EVENT_STALL, EVENT_TAKEOFF, EVENT_STUNT_DONE } from './flightModel.js';
 import { createMission, updateMission } from './missions.js';
+import { heightAt } from './terrain.js';
 import { createCombat, updateCombat, aliveCount } from './enemies.js';
 import { parseShotParams, runShotSim } from './shots.js';
 
@@ -85,7 +86,7 @@ function startSortie() {
     kills: combat.kills, charger: combat.charger,
     missiles: combat.missiles.length, projectiles: combat.projectiles.length,
     damage: flight ? flight.damage : 0,
-    flight: flight ? { x: Math.round(flight.x), y: Math.round(flight.y), z: Math.round(flight.z), speed: Math.round(flight.speed), onGround: flight.onGround, time: Math.round(flight.time * 10) / 10, throttle: Math.round(flight.throttle * 100) / 100 } : null,
+    flight: flight ? { x: Math.round(flight.x), y: Math.round(flight.y), z: Math.round(flight.z), speed: Math.round(flight.speed), onGround: flight.onGround, gearDown: flight.gearDown, stunt: flight.stunt ? flight.stunt.type : null, lastStunt: flight.lastStunt, time: Math.round(flight.time * 10) / 10, throttle: Math.round(flight.throttle * 100) / 100 } : null,
     phase,
   } : null);
   window.__setCharger = (v) => { if (combat) combat.charger = Math.max(0, Math.min(1, v)); };
@@ -106,6 +107,8 @@ function handleAction(action) {
     if (phase === 'fly') missileQueued = true;
     return;
   }
+  if (action === 'loop') { tryStunt('loop'); return; }
+  if (action === 'roll') { tryStunt('roll'); return; }
   if (action === 'pause') {
     if (phase === 'fly') {
       paused = true;
@@ -142,6 +145,20 @@ function handleAction(action) {
   }
 }
 
+function tryStunt(type) {
+  if (phase !== 'fly' || !flight) return;
+  if (flight.onGround) { hud.toast('Take off dulu'); return; }
+  if (flight.stunt) return;
+  if (flight.speed < spec.stallSpeed * 1.4) { hud.toast('Too slow for stunt — gas dulu'); return; }
+  // A loop swings ~140 m vertically and loses some height on the way
+  // down (faster on the descent than the climb), so it needs room
+  // underneath. The roll holds altitude, it needs no such guard.
+  if (type === 'loop' && flight.y - heightAt(flight.x, flight.z) < 120) { hud.toast('Too low for loop — climb first'); return; }
+  if (startStunt(flight, type)) {
+    hud.toast(type === 'loop' ? 'Looping!' : 'Barrel roll!');
+  }
+}
+
 function handleEvents(events) {
   if (events & EVENT_CRASH) {
     phase = 'crash';
@@ -150,6 +167,12 @@ function handleEvents(events) {
     return;
   }
   if (events & EVENT_FUEL_EMPTY) hud.toast('Fuel empty — engine out');
+  if (events & EVENT_TAKEOFF) hud.toast('Gear up — auto');
+  if (events & EVENT_STUNT_DONE) {
+    mission.stuntScore += 50;
+    mission.score += 50;
+    hud.toast(flight.lastStunt === 'loop' ? 'Looping +50' : 'Barrel roll +50');
+  }
   if (events & EVENT_LANDED) {
     audio.touchdown();
     if (mission.done) {
@@ -182,6 +205,8 @@ function stepGame(dt) {
   if (actions & ACTION_GEAR) handleAction('gear');
   if (actions & ACTION_FLAPS) handleAction('flaps');
   if (actions & ACTION_MISSILE) missileQueued = true;
+  if (actions & ACTION_LOOP) tryStunt('loop');
+  if (actions & ACTION_ROLL) tryStunt('roll');
   if (actions & ACTION_RESTART) { startSortie(); return; }
   if (phase !== 'fly' || paused) return;
   const events = stepFlight(flight, control, spec, wind, dt);
@@ -288,7 +313,7 @@ if (shot) {
       kills: combat.kills, charger: combat.charger,
       missiles: combat.missiles.length, projectiles: combat.projectiles.length,
       damage: flight.damage,
-      flight: { x: Math.round(flight.x), y: Math.round(flight.y), z: Math.round(flight.z), speed: Math.round(flight.speed), onGround: flight.onGround, time: Math.round(flight.time * 10) / 10, throttle: Math.round(flight.throttle * 100) / 100 },
+      flight: { x: Math.round(flight.x), y: Math.round(flight.y), z: Math.round(flight.z), speed: Math.round(flight.speed), onGround: flight.onGround, gearDown: flight.gearDown, time: Math.round(flight.time * 10) / 10, throttle: Math.round(flight.throttle * 100) / 100 },
       phase,
     });
     window.__setCharger = (v) => { combat.charger = Math.max(0, Math.min(1, v)); };
@@ -327,10 +352,17 @@ if (shot) {
 let lastTime = performance.now();
 let accumulator = 0;
 const STEP = 1 / 60;
+let perfEma = 0;
+let perfFrames = 0;
+window.__perfDebug = () => ({
+  pixelRatio: world.renderer.getPixelRatio(),
+  shadows: world.renderer.shadowMap.enabled,
+  frameMs: Math.round(perfEma * 1000),
+});
 
 function frame(now) {
   requestAnimationFrame(frame);
-  const frameDt = Math.min(0.25, (now - lastTime) / 1000);
+  const frameDt = Math.max(0, Math.min(0.25, (now - lastTime) / 1000));
   lastTime = now;
   if (phase === 'shot') return;
   if (phase === 'menu') hud.tickPreview();
@@ -341,9 +373,30 @@ function frame(now) {
     accumulator -= STEP;
     steps += 1;
   }
+  // After a hitch the backlog would otherwise be repaid as a burst of
+  // catch-up steps: the plane lurches instead of flying. Drop it and
+  // the sim runs a touch slow for one frame, which reads as smooth.
+  if (accumulator > STEP * 5) accumulator = 0;
+  // Phone smoothness: track the real frame time. When the device cannot
+  // hold the pace, step the render resolution down (2 -> 1.5 -> 1.25
+  // -> 1) instead of letting every frame stutter. One way only: going
+  // back up would oscillate. The low-power startup defaults (touch
+  // screens start at 1.25 with no shadows/antialias) live in render.js.
+  perfEma = perfEma === 0 ? frameDt : perfEma * 0.95 + frameDt * 0.05;
+  perfFrames += 1;
+  if (perfFrames > 90 && perfEma > 0.045) {
+    const pr = world.renderer.getPixelRatio();
+    const next = pr > 1.5 ? 1.5 : pr > 1.25 ? 1.25 : 1;
+    if (next < pr) world.renderer.setPixelRatio(next);
+    perfFrames = 0;
+    perfEma = 0;
+  }
+  // Visual dt is clamped: after a hitch the camera lerp (k from dt)
+  // would otherwise snap most of the way to its target in one frame.
+  const visDt = Math.min(frameDt, 1 / 30);
   if (flight && (phase === 'fly' || phase === 'pause' || phase === 'briefing' || phase === 'results' || phase === 'crash')) {
-    world.update(flight, mission, frameDt, flight.time);
-    if (combat) world.updateCombat(combat, frameDt, flight.time);
+    world.update(flight, mission, visDt, flight.time);
+    if (combat) world.updateCombat(combat, visDt, flight.time);
     hud.update(flight, mission, spec, combat);
   }
   world.renderer.render(world.scene, world.camera);

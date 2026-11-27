@@ -10,6 +10,8 @@ export const ACTION_CAMERA = 32;
 export const ACTION_MUTE = 64;
 export const ACTION_BACK = 128;
 export const ACTION_MISSILE = 256;
+export const ACTION_LOOP = 512;
+export const ACTION_ROLL = 1024;
 
 export function createInput(canvas) {
   const keys = new Set();
@@ -21,6 +23,11 @@ export function createInput(canvas) {
   // throttle slider drives setThrottle, BRAKE is a held flag. All three
   // are zero/false unless a finger is actually on a touch control.
   let touchSteer = { pitch: 0, roll: 0 };
+  // Smoothed copy of the stick: a finger on a small phone stick jitters
+  // from frame to frame, and feeding that raw into the flight model
+  // makes the plane twitch. Easing toward the target costs ~3 frames
+  // of lag and reads as smooth instead of jerky.
+  let smoothTouch = { pitch: 0, roll: 0 };
   let touchBrake = false;
   // Touch FIRE is a held flag like BRAKE: the FIRE button feeds it, and
   // Space on the keyboard is the same trigger in the air (on the ground
@@ -48,6 +55,8 @@ export function createInput(canvas) {
     if (key === 'c') actions |= ACTION_CAMERA;
     if (key === 'm') actions |= ACTION_MUTE;
     if (key === 'q') actions |= ACTION_MISSILE;
+    if (key === 'l') actions |= ACTION_LOOP;
+    if (key === 'b') actions |= ACTION_ROLL;
     if (key === 'Backspace') actions |= ACTION_BACK;
   });
   window.addEventListener('keyup', (event) => keys.delete(keyName(event)));
@@ -92,8 +101,10 @@ export function createInput(canvas) {
       pitch += dragSteer.pitch;
       roll += dragSteer.roll;
     }
-    pitch += touchSteer.pitch;
-    roll += touchSteer.roll;
+    smoothTouch.pitch += (touchSteer.pitch - smoothTouch.pitch) * 0.35;
+    smoothTouch.roll += (touchSteer.roll - smoothTouch.roll) * 0.35;
+    pitch += smoothTouch.pitch;
+    roll += smoothTouch.roll;
     return {
       pitch: Math.max(-1, Math.min(1, pitch)),
       roll: Math.max(-1, Math.min(1, roll)),

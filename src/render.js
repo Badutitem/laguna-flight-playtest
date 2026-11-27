@@ -225,14 +225,22 @@ const TIME_OF_DAY = {
 };
 
 export function createWorld(canvas, seed) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  // Low-power defaults for touch screens (phones/tablets): a phone GPU
+  // pays for every pixel twice over. Cap the render resolution at 1.25
+  // instead of 2, drop MSAA, and turn the 4096px PCFSoft shadow map off
+  // entirely — those three are what make movement stutter on a phone.
+  // Desktop keeps the full-quality path. The adaptive stepper in
+  // main.js can still lower the pixel ratio further on any device.
+  const lowPower = typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.25 : 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   // Real shadows: the sun casts them, and the shadow camera follows the
   // aircraft so the ground under it is always in the shadow frustum.
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !lowPower;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
@@ -242,7 +250,7 @@ export function createWorld(canvas, seed) {
   const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x3d5a3a, 0.9);
   scene.add(hemi);
   const sunLight = new THREE.DirectionalLight(0xfff2d8, 1.6);
-  sunLight.castShadow = true;
+  sunLight.castShadow = !lowPower;
   sunLight.shadow.mapSize.set(4096, 4096);
   sunLight.shadow.camera.near = 100;
   sunLight.shadow.camera.far = 9000;

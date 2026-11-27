@@ -46,6 +46,7 @@ export function createMission(sortie) {
     lastRingAt: 0,
     kills: 0,
     combatScore: 0,
+    stuntScore: 0,
   };
 }
 

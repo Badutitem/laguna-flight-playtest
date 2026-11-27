@@ -42,6 +42,8 @@ export function createHud(root, callbacks) {
     <div class="hud-buttons">
       <button id="btn-fire-desktop">FIRE <span class="key">Space</span></button>
       <button data-action="missile">MSL <span class="key">Q</span></button>
+      <button data-action="loop">LOOP <span class="key">L</span></button>
+      <button data-action="roll">ROLL <span class="key">B</span></button>
       <button data-action="gear">GEAR <span class="key">G</span></button>
       <button data-action="flaps">FLAPS <span class="key">F</span></button>
       <button data-action="camera">CAM <span class="key">C</span></button>
@@ -54,6 +56,8 @@ export function createHud(root, callbacks) {
       <div id="touch-actions">
         <button id="btn-fire">FIRE</button>
         <button id="btn-msl">MSL</button>
+        <button data-action="loop">LOOP</button>
+        <button data-action="roll">ROLL</button>
         <button id="btn-brake">BRAKE</button>
         <button data-action="gear">GEAR</button>
         <button data-action="flaps">FLAPS</button>
@@ -74,8 +78,8 @@ export function createHud(root, callbacks) {
       <h2>Choose a sortie</h2>
       <div class="cards sorties" id="sortie-cards"></div>
       <button class="big" id="btn-start">START ENGINE</button>
-      <p class="keys kbd">Arrows steer · W/S throttle · G gear · F flaps · Space fire (air) / brake (ground) · Q missile when charger full · C camera · P pause · drag to steer</p>
-      <p class="keys touch-only">Left stick steers · right slider is throttle · GEAR / FLAPS / CAM on the right</p>
+      <p class="keys kbd">Arrows steer · W/S throttle · G gear · F flaps · Space fire (air) / brake (ground) · Q missile when charger full · L loop · B barrel roll · C camera · P pause · drag to steer</p>
+      <p class="keys touch-only">Left stick steers · right slider is throttle · LOOP / ROLL / GEAR / FLAPS / CAM on the right</p>
     </div>
   </div>
   <div id="briefing" class="overlay hidden">
@@ -426,6 +430,7 @@ export function createHud(root, callbacks) {
       const rows = [
         ['Rings', `${mission.ringIndex}/${mission.rings.length} — ${rings} pts`],
         ['Kills', `${mission.kills || 0} jets — ${mission.combatScore || 0} pts`],
+        ...(mission.stuntScore ? [['Stunts', `${mission.stuntScore} pts`]] : []),
         ['Landing', `${mission.landingScore} pts`],
         ['Time bonus', `${mission.timeBonus} pts`],
         ['Fuel bonus', `${mission.fuelBonus} pts`],

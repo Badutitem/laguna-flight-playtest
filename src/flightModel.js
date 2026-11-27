@@ -10,6 +10,8 @@ export const EVENT_CRASH = 2;
 export const EVENT_STALL = 4;
 export const EVENT_FUEL_EMPTY = 8;
 export const EVENT_TOUCHDOWN = 16;
+export const EVENT_TAKEOFF = 32;
+export const EVENT_STUNT_DONE = 64;
 
 export function headingTo(x1, z1, x2, z2) {
   return Math.atan2(x2 - x1, -(z2 - z1));
@@ -49,7 +51,18 @@ export function createFlightState(spec, field, fuelFraction) {
     damage: 0, gearDown: true, flaps: 0, brake: false,
     onGround: true, engineOut: false, stalled: false,
     vspeed: 0, time: 0, crashReason: '', landed: false,
+    stunt: null, lastStunt: '',
   };
+}
+
+// Start a 360 stunt: 'loop' (pitch through a full vertical circle) or
+// 'roll' (bank through a full barrel roll). Only in the air, one at a
+// time. Returns false when it cannot start.
+export function startStunt(state, type) {
+  if (!state || state.onGround || state.stunt) return false;
+  if (type !== 'loop' && type !== 'roll') return false;
+  state.stunt = { type, t: 0, dur: type === 'loop' ? 3.5 : 2.5 };
+  return true;
 }
 
 function approach(value, target, rate, dt) {
@@ -98,9 +111,36 @@ export function stepFlight(state, input, spec, wind, dt) {
     if (state.speed >= spec.rotateSpeed && input.pitch > 0.25) {
       state.onGround = false;
       state.pitch = 0.14;
+      // Wheels retract into the fuselage on takeoff, so no gear shows
+      // while flying. Lower them again with G before landing.
+      state.gearDown = false;
+      events |= EVENT_TAKEOFF;
     }
     state.vspeed = 0;
   } else {
+    // A stunt in progress drives pitch/bank directly, past the normal
+    // caps (pitch 24 deg, bank 66 deg) that make a full 360 impossible.
+    // The loop pitches through a full vertical circle, the roll banks
+    // through a full barrel roll while the heading holds.
+    if (state.stunt) {
+      const s = state.stunt;
+      s.t += dt;
+      const rate = (Math.PI * 2) / s.dur;
+      if (s.type === 'loop') {
+        state.pitch += rate * dt;
+        state.bank = approach(state.bank, 0, spec.rollRate, dt);
+      } else {
+        state.bank += rate * dt;
+        state.pitch = approach(state.pitch, 0, 0.9 * authority, dt);
+      }
+      if (s.t >= s.dur) {
+        if (s.type === 'loop') state.pitch -= Math.PI * 2;
+        else state.bank -= Math.PI * 2;
+        state.lastStunt = s.type;
+        state.stunt = null;
+        events |= EVENT_STUNT_DONE;
+      }
+    } else {
     // Air: bank turns the nose, pitch sets the flight path.
     const maxBank = 1.15;
     const targetBank = input.roll * maxBank;
@@ -122,6 +162,7 @@ export function stepFlight(state, input, spec, wind, dt) {
       state.pitch = approach(state.pitch, 0, spec.stability * 0.5, dt);
     }
     if (state.stalled) state.pitch = approach(state.pitch, -0.18, 0.8, dt);
+    }
 
     // Speed: throttle sets a target, climbing bleeds it, diving restores it.
     const targetSpeed = stallSpeed + (spec.maxSpeed - stallSpeed) * (0.12 + 0.88 * throttle);
