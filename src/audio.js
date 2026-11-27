@@ -285,6 +285,23 @@ export function createAudio() {
         fuelTimer = null;
       }
     },
+    gun() {
+      noiseBurst(0.09, 0.16, 1800);
+      tone(180, 0.07, 'square', 0.08);
+    },
+    missile() {
+      tone(300, 0.5, 'sawtooth', 0.1);
+      tone(600, 0.4, 'sawtooth', 0.08, 0.1);
+      noiseBurst(0.4, 0.14, 900, 0.05);
+    },
+    explosion() {
+      noiseBurst(0.5, 0.3, 400);
+      tone(70, 0.4, 'sine', 0.25);
+    },
+    missileLock() {
+      tone(980, 0.12, 'square', 0.06);
+      tone(980, 0.12, 'square', 0.06, 0.18);
+    },
     // Debug hook for the headless play-test: no DOM dependency.
     debug() {
       return {

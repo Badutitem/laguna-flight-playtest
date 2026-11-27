@@ -439,6 +439,160 @@ export function createWorld(canvas, seed) {
   beacon.visible = false;
   scene.add(beacon);
 
+  // ---- Enemy combat visuals ----
+  // Enemies are simple dark jets with red markings (not copies of the
+  // player's five fighters, so a hostile reads as hostile at a glance),
+  // plus a small red diamond marker above each one. Tracers and missiles
+  // are pooled meshes, reused every frame — nothing is allocated per shot.
+  const combatGroup = new THREE.Group();
+  scene.add(combatGroup);
+  let combatMeshes = [];
+  const tracerPool = [];
+  const missilePool = [];
+  const explosionPool = [];
+  const explosionFx = [];
+  function makeEnemyJet() {
+    const g = new THREE.Group();
+    // Skala 1.5 (sebelumnya 1.0): musuh 50% lebih besar biar kebaca dari
+    // jarak tempur — kira-kira seukuran pesawat pemain di layar.
+    g.scale.setScalar(1.5);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3a3f46, metalness: 0.6, roughness: 0.45 });
+    const redMat = new THREE.MeshStandardMaterial({ color: 0x8c1f1f, metalness: 0.5, roughness: 0.5 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x14161a, metalness: 0.4, roughness: 0.6 });
+    const fus = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 7.5), bodyMat);
+    g.add(fus);
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.2, 8), redMat);
+    nose.rotation.x = -Math.PI / 2;
+    nose.position.set(0, 0, -4.8);
+    g.add(nose);
+    for (const s of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.14, 2.4), bodyMat);
+      wing.position.set(s * 2.4, -0.1, 0.8);
+      wing.rotation.y = s * 0.35;
+      g.add(wing);
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.6, 1.8), redMat);
+      fin.position.set(s * 0.6, 0.9, 3.0);
+      fin.rotation.z = s * -0.25;
+      g.add(fin);
+      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 1.2), redMat);
+      tip.position.set(s * 4.1, -0.1, 0.8);
+      g.add(tip);
+    }
+    const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 8), darkMat);
+    canopy.position.set(0, 0.6, -1.6);
+    canopy.scale.set(1, 0.7, 1.8);
+    g.add(canopy);
+    const marker = new THREE.Mesh(
+      new THREE.OctahedronGeometry(2.4),
+      new THREE.MeshBasicMaterial({ color: 0xff2a2a }),
+    );
+    marker.position.set(0, 5.5, 0);
+    g.add(marker);
+    g.traverse((obj) => { if (obj.isMesh) obj.castShadow = false; });
+    return { group: g, marker };
+  }
+  function getTracer(i, from) {
+    if (!tracerPool[i]) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.8, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0xffe066 }),
+      );
+      mesh.scale.set(1, 1, 12);
+      mesh.visible = false;
+      combatGroup.add(mesh);
+      tracerPool[i] = mesh;
+    }
+    tracerPool[i].material.color.setHex(from === 'player' ? 0xffe066 : 0xff5a3c);
+    return tracerPool[i];
+  }
+  function getMissileMesh(i, from) {
+    if (!missilePool[i]) {
+      const mesh = new THREE.Mesh(
+        new THREE.ConeGeometry(0.7, 3.4, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff8c1a }),
+      );
+      mesh.visible = false;
+      combatGroup.add(mesh);
+      missilePool[i] = mesh;
+    }
+    missilePool[i].material.color.setHex(from === 'player' ? 0xffe066 : 0xff3c1a);
+    return missilePool[i];
+  }
+  function getExplosionMesh() {
+    for (const m of explosionPool) if (!m.visible) return m;
+    if (explosionPool.length >= 8) return null;
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 12, 8),
+      new THREE.MeshBasicMaterial({ color: 0xff8c1a, transparent: true, opacity: 0.9 }),
+    );
+    mesh.visible = false;
+    combatGroup.add(mesh);
+    explosionPool.push(mesh);
+    return mesh;
+  }
+  function setCombat(combat) {
+    for (const m of combatMeshes) combatGroup.remove(m.group);
+    combatMeshes = (combat ? combat.enemies : []).map((e) => {
+      const built = makeEnemyJet();
+      combatGroup.add(built.group);
+      return built;
+    });
+    for (const t of tracerPool) t.visible = false;
+    for (const m of missilePool) m.visible = false;
+    for (const m of explosionPool) m.visible = false;
+    explosionFx.length = 0;
+  }
+  function updateCombat(combat, dt, time) {
+    if (!combat) return;
+    combat.enemies.forEach((e, i) => {
+      const built = combatMeshes[i];
+      if (!built) return;
+      built.group.visible = e.alive;
+      if (!e.alive) return;
+      built.group.position.set(e.x, e.y, e.z);
+      built.group.rotation.order = 'YXZ';
+      built.group.rotation.set(e.pitch, -e.heading, -e.bank);
+      const pulse = 1 + Math.sin(time * 5 + i) * 0.25;
+      built.marker.scale.setScalar(pulse);
+    });
+    combat.projectiles.forEach((p, i) => {
+      const mesh = getTracer(i, p.from);
+      mesh.visible = true;
+      mesh.position.set(p.x, p.y, p.z);
+      mesh.lookAt(p.x + p.vx, p.y + p.vy, p.z + p.vz);
+    });
+    for (let i = combat.projectiles.length; i < tracerPool.length; i += 1) tracerPool[i].visible = false;
+    combat.missiles.forEach((m, i) => {
+      const mesh = getMissileMesh(i, m.from);
+      mesh.visible = true;
+      mesh.position.set(m.x, m.y, m.z);
+      mesh.lookAt(m.x + m.vx, m.y + m.vy, m.z + m.vz);
+      mesh.rotateX(-Math.PI / 2);
+    });
+    for (let i = combat.missiles.length; i < missilePool.length; i += 1) missilePool[i].visible = false;
+    for (const ex of combat.explosions || []) {
+      const mesh = getExplosionMesh();
+      if (mesh) {
+        mesh.visible = true;
+        mesh.position.set(ex.x, ex.y, ex.z);
+        mesh.scale.setScalar(3);
+        mesh.material.opacity = 0.9;
+        explosionFx.push({ mesh, t: 0 });
+      }
+    }
+    for (let i = explosionFx.length - 1; i >= 0; i -= 1) {
+      const fx = explosionFx[i];
+      fx.t += dt;
+      if (fx.t > 0.7) {
+        fx.mesh.visible = false;
+        explosionFx.splice(i, 1);
+      } else {
+        fx.mesh.scale.setScalar(3 + fx.t * 34);
+        fx.mesh.material.opacity = 0.9 * (1 - fx.t / 0.7);
+      }
+    }
+  }
+
   // The cockpit interior: a lit instrument panel, HUD glass, stick and
   // canopy frame pillars. It is a scene child that copies the airframe pose
   // every frame (update()), so it is never caught in setAircraft()'s
@@ -680,8 +834,8 @@ export function createWorld(canvas, seed) {
   const camPos = new THREE.Vector3();
   const camLook = new THREE.Vector3();
   let cameraMode = 'chase';
-  let camDist = 19;
-  let camHeight = 6;
+  let camDist = 27;
+  let camHeight = 8;
 
   function setAircraft(kind) {
     if (kind === currentKind && aircraftParts) return;
@@ -964,7 +1118,7 @@ export function createWorld(canvas, seed) {
 
   return {
     renderer, scene, camera,
-    setAircraft, setSortie, setMission, update, resize,
+    setAircraft, setSortie, setMission, setCombat, updateCombat, update, resize,
     setCameraMode(mode) { cameraMode = mode; },
     getCameraMode() { return cameraMode; },
     setCameraOffset(dist, height) { camDist = dist; camHeight = height; },

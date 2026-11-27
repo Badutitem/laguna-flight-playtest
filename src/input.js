@@ -9,6 +9,7 @@ export const ACTION_FLAPS = 16;
 export const ACTION_CAMERA = 32;
 export const ACTION_MUTE = 64;
 export const ACTION_BACK = 128;
+export const ACTION_MISSILE = 256;
 
 export function createInput(canvas) {
   const keys = new Set();
@@ -21,6 +22,11 @@ export function createInput(canvas) {
   // are zero/false unless a finger is actually on a touch control.
   let touchSteer = { pitch: 0, roll: 0 };
   let touchBrake = false;
+  // Touch FIRE is a held flag like BRAKE: the FIRE button feeds it, and
+  // Space on the keyboard is the same trigger in the air (on the ground
+  // Space is still the brake — the flight model only brakes on the ground,
+  // and combat only fires in the air, so the two never fight).
+  let touchFire = false;
 
   function keyName(event) {
     if (event.code === 'Space') return 'Space';
@@ -41,6 +47,7 @@ export function createInput(canvas) {
     if (key === 'f') actions |= ACTION_FLAPS;
     if (key === 'c') actions |= ACTION_CAMERA;
     if (key === 'm') actions |= ACTION_MUTE;
+    if (key === 'q') actions |= ACTION_MISSILE;
     if (key === 'Backspace') actions |= ACTION_BACK;
   });
   window.addEventListener('keyup', (event) => keys.delete(keyName(event)));
@@ -92,6 +99,7 @@ export function createInput(canvas) {
       roll: Math.max(-1, Math.min(1, roll)),
       throttle,
       brake: keys.has(' ') || keys.has('Space') || touchBrake,
+      firing: keys.has(' ') || keys.has('Space') || touchFire,
     };
   }
 
@@ -104,6 +112,10 @@ export function createInput(canvas) {
 
   function setTouchBrake(value) {
     touchBrake = !!value;
+  }
+
+  function setTouchFire(value) {
+    touchFire = !!value;
   }
 
   function setThrottle(value) {
@@ -120,5 +132,5 @@ export function createInput(canvas) {
     return taken;
   }
 
-  return { control, setThrottle, setTouchSteer, setTouchBrake, queueAction, takeActions };
+  return { control, setThrottle, setTouchSteer, setTouchBrake, setTouchFire, queueAction, takeActions };
 }

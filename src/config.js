@@ -91,43 +91,101 @@ export const AIRFIELDS = {
   },
 };
 
-// The four sorties. rings are [x, altitude, z] waypoints; the last ring sits over the
-// destination runway so the flight ends on final approach.
+// The ten mission levels. Level 1 has 5 enemy jets, each level adds one:
+// enemyCount = 4 + level (L1 5, L2 6, ... L10 14). Enemies only appear in
+// missions, never in free flight (there is no free-flight mode). Rings are
+// [x, altitude, z] waypoints; the last ring sits over the destination
+// runway so the flight ends on final approach. Ring altitudes are clamped
+// to terrain + 130 m in missions.js, so every route here is flyable.
 export const SORTIES = [
   {
-    id: 'first-mail', name: 'First Mail Run', sub: 'Merpati Field to Kenari Strip',
+    id: 'first-mail', level: 1, enemyCount: 5, name: 'Level 1 — First Mail Run', sub: 'Merpati Field to Kenari Strip',
     from: 'merpati', to: 'kenari', timeOfDay: 'day', wind: { gust: 0 },
-    fuel: 1.0, brief: 'Take off, thread five sky rings over the lagoon, land at Kenari.',
+    fuel: 1.0, brief: 'Take off, thread five sky rings over the lagoon, land at Kenari. 5 enemy jets patrol the route — gun them down for bonus points.',
     rings: [
       [900, 170, 300], [1900, 220, -500], [2900, 260, -1400],
       [3800, 220, -2100], [4300, 160, -2500],
     ],
   },
   {
-    id: 'crosswind-mail', name: 'Crosswind Mail', sub: 'Kenari Strip to Merpati Field',
+    id: 'crosswind-mail', level: 2, enemyCount: 6, name: 'Level 2 — Crosswind Mail', sub: 'Kenari Strip to Merpati Field',
     from: 'kenari', to: 'merpati', timeOfDay: 'day', wind: { gust: 1 },
-    fuel: 0.9, brief: 'Six rings in a stiff crosswind. Hold your line, watch the gusts.',
+    fuel: 0.9, brief: 'Six rings in a stiff crosswind. 6 enemy jets on the route. Hold your line, watch the gusts.',
     rings: [
       [3600, 200, -2100], [2600, 260, -1400], [1600, 300, -600],
       [700, 240, 100], [-200, 190, 600], [100, 150, 850],
     ],
   },
   {
-    id: 'dusk-express', name: 'Dusk Express', sub: 'Merpati Field to Kenari Strip',
+    id: 'dusk-express', level: 3, enemyCount: 7, name: 'Level 3 — Dusk Express', sub: 'Merpati Field to Kenari Strip',
     from: 'merpati', to: 'kenari', timeOfDay: 'dusk', wind: { gust: 0.4 },
-    fuel: 0.85, brief: 'Seven rings as the sun goes down. Land by runway lights.',
+    fuel: 0.85, brief: 'Seven rings as the sun goes down. 7 enemy jets, some carry missiles. Land by runway lights.',
     rings: [
       [1000, 200, 200], [1800, 280, -700], [900, 320, -1600],
       [-800, 300, -1400], [-1800, 240, -200], [-1200, 200, 700], [200, 150, 850],
     ],
   },
   {
-    id: 'night-mail', name: 'Night Mail', sub: 'Merpati Field to Kenari Strip',
+    id: 'night-mail', level: 4, enemyCount: 8, name: 'Level 4 — Night Mail', sub: 'Merpati Field to Kenari Strip',
     from: 'merpati', to: 'kenari', timeOfDay: 'night', wind: { gust: 0.2 },
-    fuel: 0.9, brief: 'Six rings under the moon. Trust your instruments and the runway lights.',
+    fuel: 0.9, brief: 'Six rings under the moon. 8 enemy jets in the dark. Trust your instruments and the runway lights.',
     rings: [
       [1000, 210, 250], [2000, 270, -600], [3000, 250, -1500],
       [3900, 230, -2100], [4300, 180, -2500], [4100, 150, -2700],
+    ],
+  },
+  {
+    id: 'dawn-patrol', level: 5, enemyCount: 9, name: 'Level 5 — Dawn Patrol', sub: 'Merpati Field to Kenari Strip',
+    from: 'merpati', to: 'kenari', timeOfDay: 'day', wind: { gust: 0.3 },
+    fuel: 0.9, brief: 'Six rings at first light. 9 enemy jets sweep the lagoon. Clear the sky, then land the mail.',
+    rings: [
+      [1000, 200, 100], [2000, 260, -700], [3000, 280, -1500],
+      [3800, 240, -2100], [4200, 180, -2500], [4100, 150, -2700],
+    ],
+  },
+  {
+    id: 'lagoon-hunt', level: 6, enemyCount: 10, name: 'Level 6 — Lagoon Hunt', sub: 'Kenari Strip to Merpati Field',
+    from: 'kenari', to: 'merpati', timeOfDay: 'day', wind: { gust: 0.6 },
+    fuel: 0.9, brief: 'Six rings back across the lagoon. 10 enemy jets, missile carriers among them. Hunt them between the rings.',
+    rings: [
+      [3400, 210, -2000], [2400, 270, -1300], [1400, 300, -500],
+      [600, 240, 100], [-300, 190, 600], [100, 150, 850],
+    ],
+  },
+  {
+    id: 'sunset-intercept', level: 7, enemyCount: 11, name: 'Level 7 — Sunset Intercept', sub: 'Merpati Field to Kenari Strip',
+    from: 'merpati', to: 'kenari', timeOfDay: 'dusk', wind: { gust: 0.5 },
+    fuel: 0.85, brief: 'Seven rings into the sunset. 11 enemy jets intercept the mail run. Land by runway lights.',
+    rings: [
+      [1100, 210, 300], [1900, 290, -600], [1000, 330, -1500],
+      [-700, 310, -1300], [-1700, 250, -100], [-1100, 210, 800], [200, 160, 850],
+    ],
+  },
+  {
+    id: 'moonlit-patrol', level: 8, enemyCount: 12, name: 'Level 8 — Moonlit Patrol', sub: 'Kenari Strip to Merpati Field',
+    from: 'kenari', to: 'merpati', timeOfDay: 'night', wind: { gust: 0.3 },
+    fuel: 0.9, brief: 'Six rings under the moon. 12 enemy jets on patrol. Your gun charges the missile — spend it wisely.',
+    rings: [
+      [3500, 220, -2200], [2500, 280, -1400], [1500, 310, -600],
+      [600, 250, 200], [-100, 200, 700], [0, 160, 900],
+    ],
+  },
+  {
+    id: 'storm-mail', level: 9, enemyCount: 13, name: 'Level 9 — Storm Mail', sub: 'Merpati Field to Kenari Strip',
+    from: 'merpati', to: 'kenari', timeOfDay: 'day', wind: { gust: 1 },
+    fuel: 0.85, brief: 'Seven rings in a storm crosswind. 13 enemy jets in the murk. Hold your line and fight through.',
+    rings: [
+      [900, 180, 400], [1800, 240, -400], [2800, 300, -1200],
+      [3600, 260, -1900], [4200, 200, -2400], [4300, 170, -2600], [4100, 150, -2750],
+    ],
+  },
+  {
+    id: 'merpati-defence', level: 10, enemyCount: 14, name: 'Level 10 — Merpati Defence', sub: 'Kenari Strip to Merpati Field',
+    from: 'kenari', to: 'merpati', timeOfDay: 'dusk', wind: { gust: 0.8 },
+    fuel: 0.85, brief: 'Seven rings home at dusk. 14 enemy jets — the full squadron. Survive the gauntlet and bring the mail home.',
+    rings: [
+      [3800, 220, -2300], [2900, 280, -1600], [1900, 320, -800],
+      [900, 280, 0], [0, 220, 500], [-200, 180, 800], [0, 150, 900],
     ],
   },
 ];
@@ -135,3 +193,18 @@ export const SORTIES = [
 export const RING_RADIUS = 42;
 export const RING_SCORE = 100;
 export const RING_CENTER_BONUS = 50;
+
+// Combat: enemy jets in missions only. Enemy count is 4 + level (L1 5 .. L10 14).
+// Player gun: Space (in the air; on the ground Space is still the brake) or
+// the FIRE button. Player missile: Q or the MSL button, only when the
+// charger bar is full — firing a missile spends the full charge.
+// Charger fills from gun hits (+20% each), passing a ring (+15%) and a slow
+// passive trickle (+1.5% per second), so a missile is earned by fighting,
+// not given for free. Enemy jets fire guns; every third enemy also fires
+// homing missiles.
+export const ENEMY_KILL_SCORE = 150;
+export const MISSILE_KILL_BONUS = 50;
+export const CHARGER_PER_GUN_HIT = 0.20;
+export const CHARGER_PER_RING = 0.15;
+export const CHARGER_PASSIVE_PER_SEC = 0.015;
+export const ENEMY_COUNT_FOR_LEVEL = (level) => 4 + (level || 1);

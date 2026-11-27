@@ -35,6 +35,14 @@
   .director { background: rgba(4,12,20,0.62); border: 1px solid rgba(160,210,255,0.22); padding: 6px 11px; border-radius: 8px; font-size: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
   #dir-arrow { display: inline-block; color: #ffb62e; font-size: 17px; margin-right: 6px; }
   .score { background: rgba(4,12,20,0.62); border: 1px solid rgba(160,210,255,0.22); padding: 6px 11px; border-radius: 8px; font-size: 13px; letter-spacing: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .enemy { background: rgba(120,10,10,0.72); border: 1px solid rgba(255,90,60,0.55); padding: 6px 11px; border-radius: 8px; font-size: 13px; letter-spacing: 2px; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .charger { display: flex; gap: 8px; align-items: center; font-size: 12px; }
+  .charger label { color: #ffb62e; font-size: 10px; letter-spacing: 2px; font-weight: 700; }
+  #chg-fill { background: #ff8c1a; }
+  #flag-msl.on { background: #ff8c1a; color: #1a1a1a; }
+  #touch-actions #btn-fire { background: rgba(255,140,26,0.8); }
+  #touch-actions #btn-fire.held { background: #ffb62e; color: #1a1a1a; }
+  #touch-actions #btn-msl { background: rgba(255,140,26,0.45); }
   .score b { font-size: 20px; color: #ffb62e; }
   .rings { font-size: 18px; letter-spacing: 4px; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
   .rings .done { color: #2ecc40; }
@@ -49,7 +57,7 @@
   .flags span { padding: 3px 7px; border-radius: 4px; background: rgba(255,255,255,0.15); color: #ccc; }
   .flags .on { background: #2ecc40; color: #06210a; }
   .flags .off { background: #c22e2e; color: #fff; }
-  .hud-buttons { position: absolute; right: 14px; bottom: 14px; display: flex; gap: 8px; pointer-events: auto; }
+  .hud-buttons { position: absolute; right: 14px; bottom: 14px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; max-width: 400px; pointer-events: auto; }
   .hud-buttons button { background: rgba(4,12,20,0.62); color: #fff; border: 1px solid rgba(160,210,255,0.35); border-radius: 8px; padding: 8px 11px; font-size: 12px; font-weight: 700; letter-spacing: 1px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
   .hud-buttons button:hover { background: rgba(255,182,46,0.8); color: #1a1a1a; }
   .hud-buttons .key { color: #ffb62e; font-weight: 400; margin-left: 2px; }
@@ -78,13 +86,17 @@
 
   /* ---------- Overlays ---------- */
   .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgba(6,24,42,0.82), rgba(10,40,66,0.72)); pointer-events: auto; overflow-y: auto; padding: 20px; }
-  .panel { width: min(880px, 96vw); background: rgba(8, 28, 46, 0.92); border: 1px solid rgba(255,255,255,0.18); border-radius: 16px; padding: 26px 30px; }
+  .panel { width: min(880px, 96vw); background: rgba(8, 28, 46, 0.92); border: 1px solid rgba(255,255,255,0.18); border-radius: 16px; padding: 16px 22px; }
   .panel.narrow { width: min(480px, 94vw); text-align: center; }
-  .panel h1 { font-size: 44px; letter-spacing: 4px; color: #ffb62e; text-align: center; text-shadow: 0 0 24px rgba(255,182,46,0.35); }  .panel h2 { font-size: 19px; margin: 18px 0 10px; color: #9fc4e0; letter-spacing: 2px; }
+  .panel h1 { font-size: 34px; letter-spacing: 4px; color: #ffb62e; text-align: center; text-shadow: 0 0 24px rgba(255,182,46,0.35); }  .panel h2 { font-size: 19px; margin: 10px 0 6px; color: #9fc4e0; letter-spacing: 2px; }
+  /* START ENGINE stays pinned to the bottom of the screen while the menu
+     scrolls: with 10 sortie cards the panel is taller than a 720p viewport,
+     and without this the button sits below the fold and looks dead. */
+  #menu button.big { position: sticky; bottom: 10px; z-index: 5; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
   .tag { text-align: center; color: #cfe2ef; margin-top: 6px; font-size: 15px; }
   .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-  .cards.sorties { grid-template-columns: repeat(4, 1fr); }
-  .card { background: rgba(255,255,255,0.06); border: 2px solid transparent; border-radius: 10px; padding: 10px; cursor: pointer; }
+  .cards.sorties { grid-template-columns: repeat(5, 1fr); }
+  .card { background: rgba(255,255,255,0.06); border: 2px solid transparent; border-radius: 10px; padding: 7px; cursor: pointer; }
   .card:hover { border-color: rgba(255,182,46,0.6); }
   .card.sel { border-color: #ffb62e; background: rgba(255,182,46,0.14); }
   .card b { display: block; font-size: 14px; }

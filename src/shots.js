@@ -7,6 +7,7 @@ import { EVENT_CRASH } from './flightModel.js';
 import { headingTo, angleDelta, stepFlight, runwayAt } from './flightModel.js';
 import { heightAt } from './terrain.js';
 import { nextRing, updateMission } from './missions.js';
+import { updateCombat, aliveCount } from './enemies.js';
 
 export function parseShotParams() {
   const params = new URLSearchParams(window.location.search);
@@ -19,6 +20,10 @@ export function parseShotParams() {
     stopRing: parseInt(params.get('stopRing') || '2', 10),
     maxSeconds: parseInt(params.get('maxSeconds') || '240', 10),
     camera: params.get('camera') || 'chase',
+    // Test-only: start the shot with a full missile charger (?charge=1),
+    // so the autopilot's one missile launch can be verified in a screenshot
+    // run without playing a whole sortie by hand.
+    charge: parseFloat(params.get('charge') || '0'),
   };
 }
 
@@ -168,12 +173,16 @@ export function autopilotControl(flight, mission, spec, wind, straight = false) 
 }
 
 // Fly the sortie forward until the preset's stop condition, or the crash.
-export function runShotSim(world, flight, mission, spec, wind, preset) {
+// Combat runs in simMode here: enemy fire is shown but does no damage, so
+// the four bounty shots keep their previous staging while still showing
+// enemy jets and the autopilot's gun tracers.
+export function runShotSim(world, flight, mission, spec, wind, preset, combat) {
   const dt = 1 / 60;
   const maxSteps = preset.maxSeconds * 60;
   let steps = 0;
   let stopped = 'timeout';
   let airborneAt = -1;
+  let missileTried = false;
   const trace = [];
   for (let i = 0; i < maxSteps; i += 1) {
     steps += 1;
@@ -182,6 +191,28 @@ export function runShotSim(world, flight, mission, spec, wind, preset) {
     flight.gearDown = control.gear;
     const events = stepFlight(flight, control, spec, wind, dt);
     updateMission(mission, flight, events, flight.time);
+    if (combat && !flight.onGround) {
+      // Autopilot gun: fire when an enemy is ahead inside 800 m.
+      let firing = false;
+      let nearestDist = Infinity;
+      for (const e of combat.enemies) {
+        if (!e.alive) continue;
+        const d = Math.hypot(e.x - flight.x, e.y - flight.y, e.z - flight.z);
+        if (d < nearestDist) nearestDist = d;
+        if (d < 800) {
+          const toEnemy = headingTo(flight.x, flight.z, e.x, e.z);
+          if (Math.abs(angleDelta(toEnemy, flight.heading)) < 0.35) firing = true;
+        }
+      }
+      const missileRequested = !missileTried && combat.charger >= 0.999 && nearestDist < 1000;
+      if (missileRequested) missileTried = true;
+      const ce = updateCombat(combat, flight, mission, dt, { firing, missileRequested, simMode: true });
+      if (ce.kills > 0) {
+        mission.kills = combat.kills;
+        mission.combatScore = combat.combatScore;
+        mission.score += ce.killScore;
+      }
+    }
     if (i % 600 === 0) {
       trace.push([
         Math.round(flight.x), Math.round(flight.y), Math.round(flight.z),

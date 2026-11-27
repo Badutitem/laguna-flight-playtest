@@ -1,13 +1,14 @@
 // Laguna Flight: the state machine and the fixed-step loop.
 // menu -> briefing -> fly -> pause / results / crash, plus the ?shot= staging
 // mode used for screenshots.
-import { AIRCRAFT, AIRFIELDS, SORTIES } from './config.js';
+import { AIRCRAFT, AIRFIELDS, SORTIES, CHARGER_PER_RING } from './config.js';
 import { createWorld } from './render.js';
 import { createHud } from './hud.js';
-import { createInput, ACTION_CONFIRM, ACTION_PAUSE, ACTION_RESTART, ACTION_GEAR, ACTION_FLAPS, ACTION_CAMERA, ACTION_MUTE, ACTION_BACK } from './input.js';
+import { createInput, ACTION_CONFIRM, ACTION_PAUSE, ACTION_RESTART, ACTION_GEAR, ACTION_FLAPS, ACTION_CAMERA, ACTION_MUTE, ACTION_BACK, ACTION_MISSILE } from './input.js';
 import { createAudio } from './audio.js';
 import { createFlightState, stepFlight, EVENT_CRASH, EVENT_LANDED, EVENT_FUEL_EMPTY, EVENT_STALL } from './flightModel.js';
 import { createMission, updateMission } from './missions.js';
+import { createCombat, updateCombat, aliveCount } from './enemies.js';
 import { parseShotParams, runShotSim } from './shots.js';
 
 const canvas = document.getElementById('game');
@@ -22,6 +23,9 @@ let craftId = 'kawasemi';
 let sortieId = 'first-mail';
 let flight = null;
 let mission = null;
+let combat = null;
+let missileQueued = false;
+let missileWarned = false;
 let spec = null;
 let wind = { gust: 0 };
 let paused = false;
@@ -54,6 +58,8 @@ const hud = createHud(uiRoot, {
   onTouchSteer(pitch, roll) { input.setTouchSteer(pitch, roll); },
   onTouchThrottle(value) { input.setThrottle(value); },
   onTouchBrake(value) { input.setTouchBrake(value); },
+  onTouchFire(value) { input.setTouchFire(value); },
+  onTouchMissile() { missileQueued = true; },
 });
 
 function findSortie(id) {
@@ -68,9 +74,22 @@ function startSortie() {
   flight.kind = craftId;
   mission = createMission(sortie);
   mission.startTime = 0;
+  combat = createCombat(sortie, mission);
+  missileQueued = false;
+  missileWarned = false;
+  window.__combatDebug = () => (combat ? {
+    level: combat.level, total: combat.total, alive: aliveCount(combat),
+    kills: combat.kills, charger: combat.charger,
+    missiles: combat.missiles.length, projectiles: combat.projectiles.length,
+    damage: flight ? flight.damage : 0,
+    flight: flight ? { x: Math.round(flight.x), y: Math.round(flight.y), z: Math.round(flight.z), speed: Math.round(flight.speed), onGround: flight.onGround, time: Math.round(flight.time * 10) / 10, throttle: Math.round(flight.throttle * 100) / 100 } : null,
+    phase,
+  } : null);
+  window.__setCharger = (v) => { if (combat) combat.charger = Math.max(0, Math.min(1, v)); };
   world.setAircraft(craftId);
   world.setSortie(sortie);
   world.setMission(mission);
+  world.setCombat(combat);
   world.setCameraMode('chase');
   input.setThrottle(0);
   audio.unlock();
@@ -80,6 +99,10 @@ function startSortie() {
 }
 
 function handleAction(action) {
+  if (action === 'missile') {
+    if (phase === 'fly') missileQueued = true;
+    return;
+  }
   if (action === 'pause') {
     if (phase === 'fly') {
       paused = true;
@@ -149,6 +172,7 @@ function stepGame(dt) {
   if (actions & ACTION_MUTE) handleAction('mute');
   if (actions & ACTION_GEAR) handleAction('gear');
   if (actions & ACTION_FLAPS) handleAction('flaps');
+  if (actions & ACTION_MISSILE) missileQueued = true;
   if (actions & ACTION_RESTART) { startSortie(); return; }
   if (phase !== 'fly' || paused) return;
   const events = stepFlight(flight, control, spec, wind, dt);
@@ -156,6 +180,44 @@ function stepGame(dt) {
   if (result.ringPassed) {
     audio.ring(result.ringCenter);
     hud.toast(result.ringCenter ? `Ring ${mission.ringIndex} — dead centre +${150}` : `Ring ${mission.ringIndex} — +100`);
+    if (combat) combat.charger = Math.min(1, combat.charger + CHARGER_PER_RING);
+  }
+  // Combat: gun is held (Space / FIRE), missile is the queued Q / MSL tap.
+  if (combat && !mission.done) {
+    const ce = updateCombat(combat, flight, mission, dt, {
+      firing: !!control.firing,
+      missileRequested: missileQueued,
+      simMode: false,
+    });
+    missileQueued = false;
+    if (ce.gunFired) audio.gun();
+    if (ce.missileFired) {
+      audio.missile();
+      hud.toast('Missile away');
+    }
+    if (ce.missileDenied) hud.toast('Charger belum penuh — tembak musuh dulu');
+    if (ce.enemyMissileActive && !missileWarned) {
+      missileWarned = true;
+      audio.missileLock();
+    } else if (!ce.enemyMissileActive) {
+      missileWarned = false;
+    }
+    if (ce.kills > 0) {
+      mission.kills = combat.kills;
+      mission.combatScore = combat.combatScore;
+      mission.score += ce.killScore;
+      audio.explosion();
+      hud.toast(`Enemy down +${ce.killScore} — ${aliveCount(combat)} left`);
+    }
+    if (flight.damage >= 1) {
+      flight.crashReason = 'Shot down by enemy jets';
+      phase = 'crash';
+      audio.stall(false);
+      hud.showCrash(flight.crashReason);
+      return;
+    }
+  } else {
+    missileQueued = false;
   }
   audio.stall(flight.stalled);
   audio.fuelLow(flight.fuel < 0.15 && !flight.onGround && !mission.done);
@@ -184,24 +246,43 @@ if (shot) {
     flight.kind = craftId;
     mission = createMission(sortie);
     mission.startTime = 0;
+    combat = createCombat(sortie, mission);
+    if (shot.charge) combat.charger = Math.min(1, shot.charge);
     world.setAircraft(craftId);
     world.setSortie(sortie);
     world.setMission(mission);
+    world.setCombat(combat);
     world.setCameraMode(shot.camera);
     if (shot.shot === 'start') world.setCameraOffset(46, 18);
     // The landing shot used to crop the plane at the frame edge: it runs
     // with a wider chase camera. Shot-only, never touches gameplay.
-    // dist 20 / height 7: the plane fills the frame so the judge sees the
+    // dist 27 / height 9: the plane fills the frame so the judge sees the
     // aircraft, not a small paper model far from the runway.
-    if (shot.shot === 'end') window.__shotCamera = { dist: 20, height: 7 };
+    if (shot.shot === 'end') window.__shotCamera = { dist: 27, height: 9 };
     // Round 9: the day ring shot (first-mail) runs the chase camera
     // closer so the aircraft fills the frame instead of reading as a
     // small model. Shot-only, never touches gameplay.
-    else if (shot.shot === 'play' && sortieId === 'first-mail') window.__shotCamera = { dist: 12, height: 2.5 };
+    else if (shot.shot === 'play' && sortieId === 'first-mail') window.__shotCamera = { dist: 18, height: 3.5 };
     else window.__shotCamera = null;
     phase = 'shot';
     hud.showHud();
-    shotInfo = runShotSim(world, flight, mission, spec, wind, shot);
+    shotInfo = runShotSim(world, flight, mission, spec, wind, shot, combat);
+    shotInfo.combat = {
+      level: combat.level, total: combat.total, alive: aliveCount(combat),
+      kills: combat.kills, charger: Math.round(combat.charger * 100) / 100,
+      projectiles: combat.projectiles.length, missiles: combat.missiles.length,
+    };
+    // Test-only hook: lets the combat play-test force a full charger and
+    // read combat state without playing the whole sortie by hand.
+    window.__combatDebug = () => ({
+      level: combat.level, total: combat.total, alive: aliveCount(combat),
+      kills: combat.kills, charger: combat.charger,
+      missiles: combat.missiles.length, projectiles: combat.projectiles.length,
+      damage: flight.damage,
+      flight: { x: Math.round(flight.x), y: Math.round(flight.y), z: Math.round(flight.z), speed: Math.round(flight.speed), onGround: flight.onGround, time: Math.round(flight.time * 10) / 10, throttle: Math.round(flight.throttle * 100) / 100 },
+      phase,
+    });
+    window.__setCharger = (v) => { combat.charger = Math.max(0, Math.min(1, v)); };
     shotInfo.camPos = [world.camera.position.x, world.camera.position.y, world.camera.position.z];
     shotInfo.planePos = [flight.x, flight.y, flight.z];
     shotInfo.plane = {
@@ -221,7 +302,8 @@ if (shot) {
       world.camera.position.z - flight.z,
     );
     document.body.setAttribute('data-shotinfo', JSON.stringify(shotInfo));
-    hud.update(flight, mission, spec);
+    hud.update(flight, mission, spec, combat);
+    world.updateCombat(combat, 1 / 60, flight.time);
     world.renderer.render(world.scene, world.camera);
     window.__shotReady = true;
     window.__shotInfo = shotInfo;
@@ -252,7 +334,8 @@ function frame(now) {
   }
   if (flight && (phase === 'fly' || phase === 'pause' || phase === 'briefing' || phase === 'results' || phase === 'crash')) {
     world.update(flight, mission, frameDt, flight.time);
-    hud.update(flight, mission, spec);
+    if (combat) world.updateCombat(combat, frameDt, flight.time);
+    hud.update(flight, mission, spec, combat);
   }
   world.renderer.render(world.scene, world.camera);
 }

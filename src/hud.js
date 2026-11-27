@@ -28,6 +28,7 @@ export function createHud(root, callbacks) {
       <div class="craft-badge" id="craft-badge">Kawasemi</div>
       <div class="time-badge" id="time-badge">SIANG</div>
       <div class="objective" id="objective">Take off</div>
+      <div class="enemy" id="enemy-count">MUSUH 5</div>
       <div class="director"><span id="dir-arrow">➤</span><span id="dir-dist">0 m</span></div>
       <div class="score">SCORE <b id="score">0</b></div>
       <div class="rings" id="rings"></div>
@@ -35,9 +36,12 @@ export function createHud(root, callbacks) {
     <div class="hud-bottom">
       <div class="throttle"><label>THR</label><div class="tbar"><div id="thr-fill"></div></div><b id="thr-pct">0%</b></div>
       <div class="fuel"><label>FUEL</label><div class="tbar"><div id="fuel-fill"></div></div><b id="fuel-pct">100%</b></div>
-      <div class="flags"><span id="flag-gear">GEAR</span><span id="flag-flap">FLAPS</span><span id="flag-dmg">DMG 0%</span></div>
+      <div class="charger"><label>CHG</label><div class="tbar"><div id="chg-fill"></div></div><b id="chg-pct">0%</b></div>
+      <div class="flags"><span id="flag-gear">GEAR</span><span id="flag-flap">FLAPS</span><span id="flag-msl">MSL</span><span id="flag-dmg">DMG 0%</span></div>
     </div>
     <div class="hud-buttons">
+      <button id="btn-fire-desktop">FIRE <span class="key">Space</span></button>
+      <button data-action="missile">MSL <span class="key">Q</span></button>
       <button data-action="gear">GEAR <span class="key">G</span></button>
       <button data-action="flaps">FLAPS <span class="key">F</span></button>
       <button data-action="camera">CAM <span class="key">C</span></button>
@@ -48,6 +52,8 @@ export function createHud(root, callbacks) {
       <div id="stick"><div id="stick-knob"></div></div>
       <div id="thr-slider"><div id="thr-track"></div><div id="thr-handle"></div></div>
       <div id="touch-actions">
+        <button id="btn-fire">FIRE</button>
+        <button id="btn-msl">MSL</button>
         <button id="btn-brake">BRAKE</button>
         <button data-action="gear">GEAR</button>
         <button data-action="flaps">FLAPS</button>
@@ -61,14 +67,14 @@ export function createHud(root, callbacks) {
   <div id="menu" class="overlay">
     <div class="panel">
       <h1>LAGUNA FLIGHT</h1>
-      <p class="tag">Mail runs over the Merpati archipelago. Pick a fighter, fly the rings, land the mail.</p>
+      <p class="tag">Mail runs over the Merpati archipelago. Pick a fighter, fly the rings, fight the enemy jets, land the mail.</p>
       <h2>Choose your fighter</h2>
       <div class="cards" id="craft-cards"></div>
       <div class="preview"><canvas id="preview" width="340" height="190"></canvas><p id="craft-desc"></p></div>
       <h2>Choose a sortie</h2>
       <div class="cards sorties" id="sortie-cards"></div>
       <button class="big" id="btn-start">START ENGINE</button>
-      <p class="keys kbd">Arrows steer · W/S throttle · G gear · F flaps · Space brake · C camera · P pause · drag to steer</p>
+      <p class="keys kbd">Arrows steer · W/S throttle · G gear · F flaps · Space fire (air) / brake (ground) · Q missile when charger full · C camera · P pause · drag to steer</p>
       <p class="keys touch-only">Left stick steers · right slider is throttle · GEAR / FLAPS / CAM on the right</p>
     </div>
   </div>
@@ -150,7 +156,7 @@ export function createHud(root, callbacks) {
     const timeLabel = { day: 'siang', dusk: 'sore', night: 'malam' };
     $('sortie-cards').innerHTML = SORTIES.map((s) => `
       <div class="card ${s.id === selectedSortie ? 'sel' : ''}" data-sortie="${s.id}">
-        <b>${s.name}</b><i>${s.rings.length} rings · ${timeLabel[s.timeOfDay] || 'siang'}${s.wind.gust >= 1 ? ', crosswind' : s.wind.gust > 0 ? ', gusty' : ', calm'}</i>
+        <b>${s.name}</b><i>${s.rings.length} rings · ${timeLabel[s.timeOfDay] || 'siang'}${s.wind.gust >= 1 ? ', crosswind' : s.wind.gust > 0 ? ', gusty' : ', calm'} · ${s.enemyCount || 5} musuh</i>
         <span>${s.from} → ${s.to}</span>
       </div>`).join('');
     root.querySelectorAll('[data-sortie]').forEach((el) => {
@@ -357,6 +363,34 @@ export function createHud(root, callbacks) {
   brakeBtn.addEventListener('pointerup', brakeEnd);
   brakeBtn.addEventListener('pointercancel', brakeEnd);
   brakeBtn.addEventListener('pointerleave', brakeEnd);
+  // Touch FIRE (held) and MSL (one tap): same triggers as Space / Q.
+  const fireBtn = $('btn-fire');
+  if (fireBtn) {
+    fireBtn.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      fireBtn.classList.add('held');
+      callbacks.onTouchFire?.(true);
+    });
+    const fireEnd = () => {
+      fireBtn.classList.remove('held');
+      callbacks.onTouchFire?.(false);
+    };
+    fireBtn.addEventListener('pointerup', fireEnd);
+    fireBtn.addEventListener('pointercancel', fireEnd);
+    fireBtn.addEventListener('pointerleave', fireEnd);
+  }
+  const mslBtn = $('btn-msl');
+  if (mslBtn) mslBtn.addEventListener('click', () => callbacks.onAction?.('missile'));
+  const fireDesktop = $('btn-fire-desktop');
+  if (fireDesktop) {
+    fireDesktop.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      callbacks.onTouchFire?.(true);
+    });
+    const fireDesktopEnd = () => callbacks.onTouchFire?.(false);
+    fireDesktop.addEventListener('pointerup', fireDesktopEnd);
+    fireDesktop.addEventListener('pointerleave', fireDesktopEnd);
+  }
 
   renderCraftCards();
   renderSortieCards();
@@ -375,7 +409,7 @@ export function createHud(root, callbacks) {
     showBriefing(sortie, craft) {
       hideAllOverlays();
       $('brief-title').textContent = `${sortie.name} — ${craft.name}`;
-      $('brief-text').textContent = `${sortie.brief} Fly ${sortie.rings.length} rings, then land at ${sortie.to === 'merpati' ? 'Merpati Field' : 'Kenari Strip'}. Watch your fuel, mind the stall speed, gear down before you land.`;
+      $('brief-text').textContent = `${sortie.brief} Fly ${sortie.rings.length} rings, then land at ${sortie.to === 'merpati' ? 'Merpati Field' : 'Kenari Strip'}. Watch your fuel, mind the stall speed, gear down before you land. Combat: Space fires the gun, Q fires a missile only when the CHG bar is full — gun hits and rings charge it.`;
       show('briefing');
     },
     showPause() { show('pause'); },
@@ -391,6 +425,7 @@ export function createHud(root, callbacks) {
       const rings = mission.ringScore;
       const rows = [
         ['Rings', `${mission.ringIndex}/${mission.rings.length} — ${rings} pts`],
+        ['Kills', `${mission.kills || 0} jets — ${mission.combatScore || 0} pts`],
         ['Landing', `${mission.landingScore} pts`],
         ['Time bonus', `${mission.timeBonus} pts`],
         ['Fuel bonus', `${mission.fuelBonus} pts`],
@@ -413,7 +448,7 @@ export function createHud(root, callbacks) {
       if (toastTimer) window.clearTimeout(toastTimer);
       toastTimer = window.setTimeout(() => el.classList.add('hidden'), 2400);
     },
-    update(flight, mission, spec) {
+    update(flight, mission, spec, combat) {
       drawAttitude(flight);
       const knots = Math.round(flight.speed * 1.944);
       $('ro-ias').textContent = knots;
@@ -452,10 +487,23 @@ export function createHud(root, callbacks) {
       $('fuel-pct').textContent = `${Math.round(flight.fuel * 100)}%`;
       $('flag-gear').className = flight.gearDown ? 'on' : 'off';
       $('flag-flap').className = flight.flaps > 0 ? 'on' : 'off';
+      const chg = combat ? combat.charger : 0;
+      const chgFill = $('chg-fill');
+      if (chgFill) chgFill.style.width = `${Math.round(chg * 100)}%`;
+      const chgPct = $('chg-pct');
+      if (chgPct) chgPct.textContent = chg >= 0.999 ? 'MSL READY' : `${Math.round(chg * 100)}%`;
+      const mslFlag = $('flag-msl');
+      if (mslFlag) mslFlag.className = chg >= 0.999 ? 'on' : 'off';
+      const enemyEl = $('enemy-count');
+      if (enemyEl && combat) {
+        const alive = combat.enemies.reduce((n, e) => n + (e.alive ? 1 : 0), 0);
+        enemyEl.textContent = `MUSUH ${alive}/${combat.total} · KILL ${combat.kills}`;
+      }
       $('flag-dmg').textContent = `DMG ${Math.round(flight.damage * 100)}%`;
       const warn = $('warn');
       let warnText = '';
-      if (flight.stalled) warnText = 'STALL';
+      if (combat && combat.missiles.some((m) => m.from === 'enemy')) warnText = 'MISSILE INBOUND';
+      else if (flight.stalled) warnText = 'STALL';
       else if (flight.engineOut) warnText = 'ENGINE OUT — GLIDE';
       else if (flight.fuel < 0.15 && !flight.onGround) warnText = 'LOW FUEL';
       else if (mission.phase === 'final' && !flight.gearDown && flight.y < 200) warnText = 'GEAR UP';
