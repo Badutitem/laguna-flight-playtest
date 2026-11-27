@@ -42,6 +42,9 @@ const hud = createHud(uiRoot, {
     phase = 'fly';
     hud.showHud();
     audio.unlock();
+    // Drop keys pressed while reading the briefing (e.g. P) so they cannot
+    // pause the sortie on its first frame.
+    input.takeActions();
   },
   onResume() {
     paused = false;
@@ -163,11 +166,17 @@ function handleEvents(events) {
 }
 
 function stepGame(dt) {
-  if (phase !== 'fly' || paused || !flight) return;
-  const control = input.control();
-  flight.brake = control.brake;
+  if ((phase !== 'fly' && phase !== 'pause') || !flight) return;
+  // Drain the action queue even while paused. Before this fix the early
+  // return skipped takeActions() while paused, so a P pressed to resume
+  // sat in the queue unread (P could never resume), and a P pressed while
+  // paused re-paused the game on the first frame after a mouse RESUME,
+  // making RESUME look dead too.
   const actions = input.takeActions();
   if (actions & ACTION_PAUSE) handleAction('pause');
+  if (phase !== 'fly' || paused) return;
+  const control = input.control();
+  flight.brake = control.brake;
   if (actions & ACTION_CAMERA) handleAction('camera');
   if (actions & ACTION_MUTE) handleAction('mute');
   if (actions & ACTION_GEAR) handleAction('gear');
